@@ -8,6 +8,7 @@ ENSURE_GARDENER_MOD               := $(shell go get github.com/gardener/gardener
 GARDENER_HACK_DIR                 := $(shell go list -m -f "{{.Dir}}" github.com/gardener/gardener)/hack
 REGISTRY                          := europe-docker.pkg.dev/gardener-project/public
 EXECUTABLE                        := cert-controller-manager
+EXECUTABLE2                       := certman2
 REPO_ROOT                         := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 HACK_DIR                          := $(REPO_ROOT)/hack
 PROJECT                           := github.com/gardener/cert-management
@@ -26,6 +27,11 @@ include $(GARDENER_HACK_DIR)/tools.mk
 tidy:
 	@go mod tidy
 	@cp $(GARDENER_HACK_DIR)/sast.sh $(HACK_DIR)/sast.sh && chmod +xw $(HACK_DIR)/sast.sh
+
+.PHONY: clean
+clean:
+	bash $(GARDENER_HACK_DIR)/clean.sh ./cmd/... ./pkg/...
+	@rm -f $(REPO_ROOT)/pkg/apis/cert/crds/*
 
 .PHONY: check
 check: sast-report fastcheck
@@ -51,6 +57,9 @@ build-local:
 	@CGO_ENABLED=0 go build -o $(EXECUTABLE) \
 	    -ldflags "-X main.version=$(VERSION)-$(shell git rev-parse HEAD)"\
 	    ./cmd/cert-controller-manager
+	@CGO_ENABLED=0 go build -o $(EXECUTABLE2) \
+	    -ldflags "-X main.version=$(VERSION)-$(shell git rev-parse HEAD)"\
+	    ./cmd/certman2
 
 
 .PHONY: release
@@ -69,6 +78,7 @@ generate: $(VGOPATH) $(CONTROLLER_GEN)
 	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) VGOPATH=$(VGOPATH) REPO_ROOT=$(REPO_ROOT) ./hack/generate-code
 	@CONTROLLER_MANAGER_LIB_HACK_DIR=$(CONTROLLER_MANAGER_LIB_HACK_DIR) CONTROLLER_GEN=$(shell realpath $(CONTROLLER_GEN)) go generate ./pkg/apis/cert/...
 	@./hack/copy-crds.sh
+	@GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) VGOPATH=$(VGOPATH) REPO_ROOT=$(REPO_ROOT) CONTROLLER_GEN=$(shell realpath $(CONTROLLER_GEN)) go generate ./pkg/certman2/apis/cert/...
 	@go fmt ./pkg/...
 
 .PHONY: docker-images
